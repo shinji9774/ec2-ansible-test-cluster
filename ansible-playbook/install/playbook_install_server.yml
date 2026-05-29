@@ -1,15 +1,15 @@
 ---
 - name: Install server
   hosts: all
-  gather_facts: true
+  gather_facts: false
   roles:
-      - role: check_connection
-      - role: common_packages
-      - role: load_vars
-      - role: ssh_setup
+    - role: check_connection
+    - role: common_packages
+    - role: load_vars
+    - role: ssh_setup
 
 - name: Install Master server
   hosts: master
   gather_facts: false
   roles:
-      - role: ansible
+    - role: ansible

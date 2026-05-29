@@ -20,7 +20,7 @@
 
 - name: Regist publickey to authorized_key
   ansible.posix.authorized_key:
-    user: "{{ ansible_user_id }}"
+    user: "{{ ansible_user }}"
     state: present
     key: "{{ ssh_setup_key_pair_info.stdout }}"
 
