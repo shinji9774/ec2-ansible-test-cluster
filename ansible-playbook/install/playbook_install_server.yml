@@ -4,6 +4,7 @@
   gather_facts: false
   roles:
     - role: check_connection
+    - role: apt_upgrade
     - role: common_packages
     - role: load_vars
     - role: ssh_setup
@@ -13,3 +14,9 @@
   gather_facts: false
   roles:
     - role: ansible
+
+- name: Reboot after installation
+  hosts: all
+  gather_facts: false
+  roles:
+    - role: reboot
