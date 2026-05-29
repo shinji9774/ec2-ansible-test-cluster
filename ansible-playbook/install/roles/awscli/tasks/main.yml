@@ -1,0 +1,42 @@
+---
+- name: Check if AWS CLI is installed
+  ansible.builtin.command:
+    cmd: aws --version
+  register: awscli_check
+  failed_when: false
+  changed_when: false
+
+- name: Create temporary directory
+  become: true
+  ansible.builtin.tempfile:
+    state: directory
+  register: awscli_temp_dir
+
+- name: Download AWS CLI
+  block:
+    - name: Download AWS CLI
+      become: true
+      ansible.builtin.get_url:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: "{{ awscli_temp_dir.path }}/awscliv2.zip"
+        mode: "0644"
+
+    - name: Unzip AWS CLI
+      become: true
+      ansible.builtin.unarchive:
+        src: "{{ awscli_temp_dir.path }}/awscliv2.zip"
+        dest: "{{ awscli_temp_dir.path }}"
+        remote_src: true
+
+    - name: Install AWS CLI
+      become: true
+      ansible.builtin.command:
+        cmd: "{{ awscli_temp_dir.path }}/aws/install {{ '--update' if awscli_check.rc == 0 else '' }}"
+      changed_when: false
+
+  always:
+    - name: Clean up temporary directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ awscli_temp_dir.path }}"
+        state: absent

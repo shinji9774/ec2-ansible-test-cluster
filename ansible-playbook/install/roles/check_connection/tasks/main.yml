@@ -1,0 +1,7 @@
+---
+
+- name: Wait for establishing connection
+  ansible.builtin.wait_for_connection:
+    timeout: "{{ connection_timeout }}"
+  vars:
+    connection_timeout: "{{ 300 if lookup('env', 'EXECUTE_FROM_ECS') == 'true' else 60 }}"

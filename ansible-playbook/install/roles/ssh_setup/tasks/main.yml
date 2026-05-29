@@ -1,0 +1,23 @@
+---
+- name: Create .ssh directory
+  ansible.builtin.file:
+    path: "~/.ssh"
+    state: directory
+    mode: "0700"
+
+- name: Describe key pair
+  ansible.builtin.command:
+    cmd: >-
+      aws ec2 describe-key-pairs
+      --key-names {{ home_key_pair_name }}
+      --include-public-key
+      --query 'KeyPairs[0].PublicKey'
+      --output text
+  register: ssh_setup_key_pair_info
+  changed_when: false
+
+- name: Regist publickey to authorized_key
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user_id }}"
+    state: present
+    key: "{{ ssh_setup_key_pair_info.stdout }}"

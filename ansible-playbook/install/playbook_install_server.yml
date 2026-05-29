@@ -1,0 +1,16 @@
+---
+- name: Install Minecraft server
+  hosts: all
+  gather_facts: true
+  roles:
+      - role: check_connection
+      - role: common_packages
+      - role: load_vars
+      - role: awscli
+      - role: ssh_setup
+
+- name: Install Master server
+  hosts: master
+  gather_facts: false
+  roles:
+      - role: ansible

@@ -1,0 +1,7 @@
+---
+- name: Install ansible
+  ansible.builtin.pip:
+    name: ansible
+    state: present
+    break_system_packages: true
+  become: true

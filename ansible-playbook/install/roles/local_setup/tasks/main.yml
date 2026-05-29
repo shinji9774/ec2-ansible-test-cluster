@@ -1,0 +1,36 @@
+---
+- name: Get private key from AWS Secrets Manager
+  ansible.builtin.command: >-
+    aws ssm get-parameter
+    --name /ec2/keypair/{{ keypair_id }}
+    --with-decryption
+    --query Parameter.Value
+    --output text
+  register: local_setup_private_key
+  changed_when: false
+
+- name: Create .ssh directory
+  ansible.builtin.file:
+    path: "~/.ssh"
+    mode: "0700"
+    state: directory
+
+- name: Put private key to file
+  ansible.builtin.copy:
+    content: "{{ local_setup_private_key.stdout }}"
+    dest: "~/.ssh/id_rsa_{{ keypair_id }}"
+    mode: "0600"
+  register: local_setup_private_key_file
+
+- name: Create tmp directory
+  ansible.builtin.file:
+    path: "{{ lookup('env', 'PWD') }}/tmp"
+    mode: "0755"
+    state: directory
+  register: local_setup_tmp_dir
+
+- name: Generate inventory
+  ansible.builtin.template:
+    src: "hosts.yml.j2"
+    dest: "{{ local_setup_tmp_dir.path }}/hosts.yml"
+    mode: "0644"
