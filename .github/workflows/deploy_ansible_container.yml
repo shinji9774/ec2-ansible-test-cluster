@@ -51,6 +51,7 @@ jobs:
           tags: ${{ env.TEST_TAG }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/${{ env.ANSIBLE_IMAGE_NAME }}:buildcache
           cache-to: type=local,dest=/tmp/.buildx-cache
+          provenance: false
 
       - name: Test
         run: |
@@ -85,3 +86,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/${{ env.ANSIBLE_IMAGE_NAME }}:buildcache,mode=max
+          provenance: false
