@@ -18,7 +18,7 @@
 - name: Put private key to file
   ansible.builtin.copy:
     content: "{{ local_setup_private_key.stdout }}"
-    dest: "~/.ssh/id_rsa_{{ keypair_id }}"
+    dest: "~/.ssh/id_rsa"
     mode: "0600"
   register: local_setup_private_key_file
 
