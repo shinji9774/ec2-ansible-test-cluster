@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.cache \
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt/lists \
     apt-get update && \
-    apt-get install make unzip -y
+    apt-get install openssh-client make unzip -y
 
 WORKDIR /ansible-playbook
 COPY . /ansible-playbook
