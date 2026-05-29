@@ -41,7 +41,7 @@ build: ## [development] build docker image
 	@docker build --tag ansible-test --target installed .
 
 run-local: build ## [development] run ansible playbook in docker container
-	@docker run --rm -it ansible-test sh
+	@docker run --rm -it ansible-test bash
 
 syntax-check: ## [development] syntax check all playbooks
 	ansible-playbook -i hosts.yml --syntax-check $(shell find . -name 'playbook_*.yml')

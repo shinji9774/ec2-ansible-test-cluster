@@ -1,5 +1,6 @@
-FROM python:3.12-alpine AS base
+FROM python:3.12-slim-trixie AS base
 
+ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Tokyo
 
 FROM base AS installed
@@ -7,8 +8,10 @@ FROM base AS installed
 RUN --mount=type=cache,target=/root/.cache \
     pip install --no-cache-dir ansible
 
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add --update --no-cache make
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt/lists \
+    apt-get update && \
+    apt-get install make unzip -y
 
 WORKDIR /ansible-playbook
 COPY . /ansible-playbook
