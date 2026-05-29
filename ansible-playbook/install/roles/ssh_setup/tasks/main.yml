@@ -21,3 +21,8 @@
     user: "{{ ansible_user_id }}"
     state: present
     key: "{{ ssh_setup_key_pair_info.stdout }}"
+
+- name: Setup master server
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/setup_master.yml"
+  when: "inventory_hostname in groups['master']"
