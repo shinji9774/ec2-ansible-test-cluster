@@ -43,5 +43,8 @@ build: ## [development] build docker image
 run-local: build ## [development] run ansible playbook in docker container
 	@docker run --rm -it ansible-test sh
 
+test: build ## [development] run ansible playbook in docker container for test
+	@docker run --rm ansible-test make syntax-check
+
 syntax-check: ## [development] syntax check all playbooks
 	ansible-playbook -i hosts.yml --syntax-check $(shell find . -name 'playbook_*.yml')
