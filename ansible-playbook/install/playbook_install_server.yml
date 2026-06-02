@@ -6,8 +6,10 @@
     - role: check_connection
     - role: apt_upgrade
     - role: common_packages
+    - role: timezone
     - role: load_vars
     - role: ssh_setup
+    - role: auto_shutdown
 
 - name: Install Master server
   hosts: master
