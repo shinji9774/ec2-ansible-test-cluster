@@ -1,6 +1,6 @@
 ---
 - name: Install server
-  hosts: all
+  hosts: servers
   gather_facts: false
   roles:
     - role: check_connection
@@ -17,7 +17,7 @@
     - role: ansible
 
 - name: Reboot after installation
-  hosts: all
+  hosts: servers
   gather_facts: false
   roles:
     - role: reboot
