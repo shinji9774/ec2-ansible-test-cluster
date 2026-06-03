@@ -1,9 +1,9 @@
 ---
 - name: Load vars
   ansible.builtin.set_fact:
-    target_master: "{{ lookup('env', 'TARGET_IP_MASTER', default=undef()) }}"
-    target_target01: "{{ lookup('env', 'TARGET_IP_TARGET01', default=undef()) }}"
-    target_target02: "{{ lookup('env', 'TARGET_IP_TARGET02', default=undef()) }}"
+    target_master: "{{ lookup('env', 'TARGET_MASTER_INSTANCE_ID', default=undef()) }}"
+    target_target01: "{{ lookup('env', 'TARGET_TARGET01_INSTANCE_ID', default=undef()) }}"
+    target_target02: "{{ lookup('env', 'TARGET_TARGET02_INSTANCE_ID', default=undef()) }}"
     keypair_id: "{{ lookup('env', 'KEYPAIR_ID', default=undef()) }}"
     home_key_pair_name: "{{ lookup('env', 'KEY_NAME', default=undef()) }}"
     aws_region: "{{ lookup('env', 'AWS_REGION', default=undef()) }}"
