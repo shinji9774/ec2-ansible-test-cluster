@@ -1,6 +1,6 @@
-.PHONY : help check-connection apt-update update-minecraft
-
 ANSIBLE_LOG_PATH ?= ./logs/ansible-$$(date +%Y%m%d-%H%M%S).log
+
+export ANSIBLE_CONFIG := ./ansible.cfg
 
 define _printhelp
 	@echo '--------------------------------------------------'; \
@@ -15,33 +15,32 @@ define _run_Playbook
 	ansible-playbook -i ./hosts.yml "./$(1)" $(2) $(ANSIBLE_EXTRA_OPTIONS)
 endef
 
-define _run_Playbook_from_ecs
-	@test -f ./tmp/hosts.yml || \
-	ansible-playbook -c local "./$(shell dirname $(1))/playbook_prepare_container.yml" $(2) $(ANSIBLE_EXTRA_OPTIONS)
-	@ansible-playbook -i ./tmp/hosts.yml "./$(1)" $(2) $(ANSIBLE_EXTRA_OPTIONS)
-endef
-
-ifeq ($(EXECUTE_FROM_ECS),)
-	RUN_PLAYBOOK := _run_Playbook
-else
-	RUN_PLAYBOOK := _run_Playbook_from_ecs
-endif
-
-export ANSIBLE_CONFIG := ./ansible.cfg
-
+.PHONY : help
 help: ## [common] show list
 	@$(call _printhelp,common)
 	@$(call _printhelp,install)
 	@$(call _printhelp,development)
 
+.PHONY : install-server
 install-server: ## [install] install minecraft server from ECS
-	@$(call $(RUN_PLAYBOOK),install/playbook_install_server.yml,)
+	@$(call _run_Playbook,install/playbook_install_server.yml,)
 
+.PHONY : build
 build: ## [development] build docker image
 	@docker build --tag ansible-test --target installed .
 
+.PHONY : run-local
 run-local: build ## [development] run ansible playbook in docker container
 	@docker run --rm -it ansible-test bash
 
+.PHONY : syntax-check
 syntax-check: ## [development] syntax check all playbooks
 	ansible-playbook -i hosts.yml --syntax-check $(shell find . -name 'playbook_*.yml')
+
+.PHONY : generate-ansible-requirements
+generate-ansible-requirements: ## [development] generate ansible collection requirements
+	@echo "# Generated Ansible Collection Requirements" > requirements.yml; \
+	echo "---" >> requirements.yml; \
+	find install/roles -path '*/tasks/*.yml' | xargs cat | \
+	yq -sy '{"collections":[.[].[] | keys[] | split(".")[0:2] | select(length > 1) | join(".") | select(. != "ansible.builtin")] | unique}' | \
+	tee -a requirements.yml

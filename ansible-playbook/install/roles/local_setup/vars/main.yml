@@ -1,0 +1,10 @@
+local_setup_targets:
+  - host: "{{ target_master }}"
+    groups:
+      - master
+  - host: "{{ target_target01 }}"
+    groups:
+      - targets
+  - host: "{{ target_target02 }}"
+    groups:
+      - targets

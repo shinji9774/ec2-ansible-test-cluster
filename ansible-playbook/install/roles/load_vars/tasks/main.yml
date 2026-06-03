@@ -6,24 +6,4 @@
     target_target02: "{{ lookup('env', 'TARGET_IP_TARGET02', default=undef()) }}"
     keypair_id: "{{ lookup('env', 'KEYPAIR_ID', default=undef()) }}"
     home_key_pair_name: "{{ lookup('env', 'KEY_NAME', default=undef()) }}"
-    aws_region: ap-northeast-1
-  when: inventory_hostname == 'localhost'
-
-- name: Validate required common variables
-  ansible.builtin.assert:
-    that:
-      - home_key_pair_name != ''
-      - aws_region != ''
-    fail_msg: "One or more required variables are not set. Please ensure all required environment variables are provided."
-    quiet: true
-
-- name: Validate required variables for localhost
-  ansible.builtin.assert:
-    that:
-      - target_master != ''
-      - target_target01 != ''
-      - target_target02 != ''
-      - keypair_id != ''
-    fail_msg: "One or more required variables are not set. Please ensure all required environment variables are provided."
-    quiet: true
-  when: inventory_hostname == 'localhost'
+    aws_region: "{{ lookup('env', 'AWS_REGION', default=undef()) }}"

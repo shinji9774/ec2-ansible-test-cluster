@@ -5,16 +5,12 @@
     state: directory
     mode: "0700"
 
-- name: Describe key pair
-  ansible.builtin.command:
-    cmd: >-
-      aws ec2 describe-key-pairs
-      --key-names {{ home_key_pair_name }}
-      --include-public-key
-      --query 'KeyPairs[0].PublicKey'
-      --output text
+- name: Get key pair info
+  amazon.aws.ec2_key_info:
+    names:
+      - "{{ home_key_pair_name }}"
+    include_public_key: true
   register: ssh_setup_key_pair_info
-  changed_when: false
   run_once: true
   delegate_to: localhost
 
@@ -22,7 +18,7 @@
   ansible.posix.authorized_key:
     user: "{{ ansible_user }}"
     state: present
-    key: "{{ ssh_setup_key_pair_info.stdout }}"
+    key: "{{ ssh_setup_key_pair_info.keypairs[0].public_key }}"
 
 - name: Setup master server
   ansible.builtin.include_tasks:

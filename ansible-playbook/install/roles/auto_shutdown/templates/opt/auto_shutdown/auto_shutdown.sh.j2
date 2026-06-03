@@ -9,6 +9,8 @@ IDLE_THRESHOLD=${3:-30} # 分
 function send_discord_notification() {
   local idle_minutes=$1
   local discord_webhook_url="{{ discord_webhook_url }}"
+  local instance_id="{{ ec2_instance_id }}"
+  local aws_region="{{ aws_region }}"
 
   if [ -z "$discord_webhook_url" ]; then
     return 0
@@ -27,8 +29,8 @@ function send_discord_notification() {
       "description": "Auto shutdown triggered",
       "fields": [
         {
-          "name": "Hostname",
-          "value": "${hostname}",
+          "name": "Instance ID",
+          "value": "[${instance_id}](https://console.aws.amazon.com/ec2/v2/home?region=${aws_region}#Instances:instanceId=${instance_id})",
           "inline": true
         },
         {

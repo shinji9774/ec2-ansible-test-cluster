@@ -1,24 +1,7 @@
 ---
+- name: Setup Ansible container
+  ansible.builtin.import_playbook: _playbook_prepare_container.yml
+  when: lookup('env', 'AWS_EXECUTION_ENV') in ['AWS_ECS_FARGATE', 'AWS_ECS_EC2']
+
 - name: Install server
-  hosts: all
-  gather_facts: false
-  roles:
-    - role: check_connection
-    - role: apt_upgrade
-    - role: common_packages
-    - role: timezone
-    - role: load_vars
-    - role: ssh_setup
-    - role: auto_shutdown
-
-- name: Install Master server
-  hosts: master
-  gather_facts: false
-  roles:
-    - role: ansible
-
-- name: Reboot after installation
-  hosts: all
-  gather_facts: false
-  roles:
-    - role: reboot
+  ansible.builtin.import_playbook: _playbook_install_server.yml
