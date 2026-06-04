@@ -1,0 +1,7 @@
+[servers]
+{% for host in groups['targets'] %}
+{{ host }} ansible_host={{ hostvars[host]['ansible_host'] }}
+{% endfor %}
+
+[all:vars]
+ansible_user={{ ansible_user }}

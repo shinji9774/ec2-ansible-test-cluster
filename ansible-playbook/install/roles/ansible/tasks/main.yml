@@ -5,3 +5,24 @@
     state: present
     break_system_packages: true
   become: true
+
+- name: Create ansible inventory file
+  ansible.builtin.template:
+    src: hosts_sample.j2
+    dest: /opt/hosts_sample
+    mode: "0644"
+  become: true
+
+- name: Put private key to master server
+  ansible.builtin.copy:
+    src: "{{ ansible_ssh_private_key_file }}"
+    dest: "~/.ssh/id_rsa"
+    mode: "0600"
+
+- name: Check ansible connection to target servers
+  ansible.builtin.command: >-
+    ansible
+    -i /opt/hosts_sample
+    all
+    -m ping
+  changed_when: false
