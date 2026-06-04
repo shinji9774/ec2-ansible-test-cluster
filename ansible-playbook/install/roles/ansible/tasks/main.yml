@@ -23,6 +23,7 @@
   ansible.builtin.command: >-
     ansible
     -i /opt/hosts_sample
+    --ssh-common-args='-o StrictHostKeyChecking=no'
     all
     -m ping
   changed_when: false
