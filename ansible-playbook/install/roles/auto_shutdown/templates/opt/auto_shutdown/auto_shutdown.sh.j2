@@ -1,9 +1,9 @@
 #!/bin/bash
-# 20:00〜09:00の間、30分以上誰もログインしていなければシャットダウン
+# $RANGE_STARTから$RANGE_ENDの期間外で、$IDLE_THRESHOLD分以上誰もログインしていなければシャットダウン
 
 IDLE_FILE="/tmp/idle_since"
-RANGE_START=${1:-9}
-RANGE_END=${2:-20}
+RANGE_START=${1:-9}     # 時
+RANGE_END=${2:-19}      # 時
 IDLE_THRESHOLD=${3:-30} # 分
 
 function send_discord_notification() {
@@ -15,9 +15,6 @@ function send_discord_notification() {
   if [ -z "$discord_webhook_url" ]; then
     return 0
   fi
-
-  local hostname
-  hostname=$(hostname)
 
   local payload
   payload=$(
@@ -51,10 +48,10 @@ function send_discord_notification() {
 EOF
   )
 
-  curl -X POST "$discord_webhook_url" \
+  curl --silent --show-error \
+    -X POST "$discord_webhook_url" \
     -H "Content-Type: application/json" \
-    -d "$payload" \
-    2>/dev/null
+    -d "$payload"
 }
 
 function main() {
@@ -66,36 +63,37 @@ function main() {
   local login_count
   login_count=$(who | wc -l)
 
-  if [ "$login_count" -eq 0 ]; then
-    if [ ! -f "$IDLE_FILE" ]; then
-      # 誰もいない状態が始まった時間を記録
-      date +%s >"$IDLE_FILE"
-      exit 0
-    fi
-
-    # 時間内ならシャットダウンしない
-    if [ "$hour" -ge "$RANGE_START" ] && [ "$hour" -lt "$RANGE_END" ]; then
-      exit 0
-    fi
-
-    local idle_since
-    idle_since=$(cat "$IDLE_FILE")
-    local now
-    now=$(date +%s)
-    local idle_minutes
-    idle_minutes=$(((now - idle_since) / 60))
-
-    if [ "$idle_minutes" -ge "$IDLE_THRESHOLD" ]; then
-      echo "No users logged in for ${idle_minutes}m during off-hours. Shutting down."
-      rm -f "$IDLE_FILE"
-
-      send_discord_notification "$idle_minutes"
-
-      /sbin/shutdown -h
-    fi
-  else
+  if [ "$login_count" -gt 0 ]; then
     # 誰かいたらリセット
     rm -f "$IDLE_FILE"
+    exit 0
+  fi
+
+  if [ ! -f "$IDLE_FILE" ]; then
+    # 誰もいない状態が始まった時間を記録
+    date +%s >"$IDLE_FILE"
+    exit 0
+  fi
+
+  # 時間内ならシャットダウンしない
+  if [ "$hour" -ge "$RANGE_START" ] && [ "$hour" -lt "$RANGE_END" ]; then
+    exit 0
+  fi
+
+  local idle_since
+  idle_since=$(cat "$IDLE_FILE")
+  local now
+  now=$(date +%s)
+  local idle_minutes
+  idle_minutes=$(((now - idle_since) / 60))
+
+  if [ "$idle_minutes" -ge "$IDLE_THRESHOLD" ]; then
+    echo "No users logged in for ${idle_minutes}m during off-hours. Shutting down."
+    rm -f "$IDLE_FILE"
+
+    send_discord_notification "$idle_minutes"
+
+    /sbin/shutdown -h
   fi
 }
 
