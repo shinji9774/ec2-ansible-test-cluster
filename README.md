@@ -72,3 +72,17 @@
    - インスタンス一覧の画面でインスタンスの状態が「停止済み」になることを確認
 
 7. **他のサーバについても本手順の3～6の操作を実施**
+
+## Ansible実行
+
+### サンプルhostsファイル
+
+- `/opt/hosts_sample` 参照
+  ```ini
+  [servers]
+  test-dev-target-1 ansible_host=<private ip>
+  test-dev-target-2 ansible_host=<private ip>
+
+  [all:vars]
+  ansible_user=ubuntu
+  ```
