@@ -1,0 +1,492 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template to create Ansible test cluster on Amazon EC2s
+
+Parameters:
+  VpcLookupFunctionArn:
+    Description: ARN of the Lambda function that looks up VPC info
+    Type: String
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Availability Zone for the subnet
+  SubnetPrefix:
+    Type: Number
+    Default: "24"
+    AllowedValues: [24, 25, 26, 27, 28]
+    Description: Subnet prefix length (CIDR mask)
+  KeyName:
+    Description: The EC2 Key Pair to allow SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+  MyIP:
+    Description: IP address allowed to access EC2
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  EcrRegistry:
+    Description: ECR Registry Name of Lambda Container Image
+    Type: String
+  UserName:
+    Description: Username allowed to access EC2
+    Type: String
+  DiscordWebhookUrl:
+    Description: Discord Webhook URL for Notifications
+    Type: String
+
+Resources:
+  # -------------------------------------------------------
+  # Lambda: VPC から IGW ID と空きサブネット CIDR を取得
+  # -------------------------------------------------------
+  VpcLookup:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Ref VpcLookupFunctionArn
+      RequestPrefix: !Sub ${AWS::StackName}
+      SubnetPrefix: !Ref SubnetPrefix
+
+  # Create Public RouteTable
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !GetAtt VpcLookup.VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-pub-rt
+
+  # Create Public Subnet C
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !GetAtt VpcLookup.VpcId
+      CidrBlock: !GetAtt VpcLookup.SubnetCidrBlock
+      AvailabilityZone: !Ref AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-pub-sub-c
+  PubSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTable
+
+  # Route for InternetGateway
+  RoutetoInternet:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !GetAtt VpcLookup.InternetGatewayId
+
+  # ------------------------------------------------------------#
+  # CloudWatch Logs
+  # ------------------------------------------------------------#
+  ECSLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/logs/${AWS::StackName}-init-log
+
+  # ------------------------------------------------------------#
+  # IAM
+  # ------------------------------------------------------------#
+  AWSBatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - batch.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+      Path: /service-role/
+      RoleName: !Sub ${AWS::StackName}-batch-svc-role
+
+  # example: https://docs.aws.amazon.com/ja_jp/AmazonECS/latest/developerguide/task_execution_IAM_role.html
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Path: /service-role/
+      RoleName: !Sub ${AWS::StackName}-task-execution-role
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      RoleName: !Sub ${AWS::StackName}-tast-role
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-task-role-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeKeyPairs
+                  - ssm:GetParameter
+                Resource: "*"
+
+  # ------------------------------------------------------------#
+  # AWS Batch
+  # ------------------------------------------------------------#
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-batch-default-sg
+      GroupDescription: Default security group for AWS Batch compute environment
+      VpcId: !GetAtt VpcLookup.VpcId
+
+  MyComputeEnv:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt AWSBatchServiceRole.Arn
+      ComputeEnvironmentName: !Sub ${AWS::StackName}-compute-env
+      ComputeResources:
+        MaxvCpus: 1
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup
+        Type: FARGATE
+        Subnets:
+          - !Ref PublicSubnetC
+      State: ENABLED
+
+  # Create JobQueue
+  MyJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref MyComputeEnv
+      State: ENABLED
+      Priority: 1
+      JobQueueName: !Sub ${AWS::StackName}-queue
+
+  # Create JobDefinition
+  MyJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      JobDefinitionName: !Sub ${AWS::StackName}-jobdef
+      Timeout:
+        AttemptDurationSeconds: 1800
+      PlatformCapabilities:
+        - FARGATE
+      ContainerProperties:
+        Image: !Sub ${EcrRegistry}/ansible-container/ansible-test-server-provisioner:latest
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref ECSLogGroup
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: test
+        Environment:
+          - Name: TARGET_MASTER_INSTANCE_ID
+            Value: !Ref MasterNode
+          - Name: TARGET_TARGET01_INSTANCE_ID
+            Value: !Ref TargetNode1
+          - Name: TARGET_TARGET02_INSTANCE_ID
+            Value: !Ref TargetNode2
+          - Name: KEYPAIR_ID
+            Value: !GetAtt ClusterKeyPair.KeyPairId
+          - Name: KEY_NAME
+            Value: !Ref KeyName
+          - Name: EXECUTE_FROM_ECS
+            Value: "true"
+          - Name: DISCORD_WEBHOOK_URL
+            Value: !Ref DiscordWebhookUrl
+        Command:
+          - make
+          - install-server
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        ResourceRequirements:
+          - Type: VCPU
+            Value: "1"
+          - Type: MEMORY
+            Value: "2048"
+        ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+        JobRoleArn: !GetAtt TaskRole.Arn
+      RetryStrategy:
+        Attempts: 1
+
+  JobSubmit:
+    Type: AWS::CloudFormation::CustomResource
+    #Type: Custom::JobSubmit
+    DependsOn:
+      - MasterNode
+      - TargetNode1
+      - TargetNode2
+    Properties:
+      ServiceToken: !GetAtt JobSubmitFunction.Arn
+      JobName: !Sub ${AWS::StackName}-init-job
+      JobQueue: !Ref MyJobQueue
+      JobDef: !Ref MyJobDefinition
+
+  JobSubmitFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Role: !GetAtt JobSubmitFunctionRole.Arn
+      Handler: index.handler
+      LoggingConfig:
+        LogGroup: !Ref JobSubmitFunctionLogGroup
+      Code:
+        ZipFile: |
+          import json
+
+          import boto3
+          import cfnresponse
+
+          TIMEOUTSEC = 300
+
+
+          def submit_job(event) -> dict:
+              batchclient = boto3.client("batch")
+
+              try:
+                  jobname = str(event["ResourceProperties"]["JobName"])
+                  jobqueue = str(event["ResourceProperties"]["JobQueue"])
+                  jobdef = str(event["ResourceProperties"]["JobDef"])
+
+                  return batchclient.submit_job(
+                      jobName=jobname,
+                      jobQueue=jobqueue,
+                      jobDefinition=jobdef,
+                  )
+
+              except Exception as e:
+                  return {"failures": str(e)}
+
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] != "Create":
+                      cfnresponsedata = {
+                          "JobId": "",
+                          "JobName": "",
+                      }
+                      cfnresponse.send(
+                          event, context, cfnresponse.SUCCESS, cfnresponsedata, "CustomResourcePhysicalID"
+                      )
+                      return
+
+                  response = submit_job(event)
+
+                  if response.get("failures", ""):
+                      reason = response["failures"]
+                      print("Error: Failed to submit job: " + reason)
+                      cfnresponse.send(
+                          event, context, cfnresponse.FAILED, {}, "CustomResourcePhysicalID", reason=reason
+                      )
+                      return
+
+                  print("INFO: Job submitted: " + json.dumps(response))
+
+                  cfnresponsedata = {
+                      "JobId": response.get("jobId", ""),
+                      "JobName": response.get("jobName", ""),
+                  }
+                  cfnresponse.send(
+                      event, context, cfnresponse.SUCCESS, cfnresponsedata, "CustomResourcePhysicalID"
+                  )
+                  return
+
+              except Exception as e:
+                  print(f"Error: {e}")
+                  cfnresponse.send(
+                      event, context, cfnresponse.FAILED, {}, "CustomResourcePhysicalID", reason=str(e)
+                  )
+                  return
+
+  JobSubmitFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      RoleName: !Sub ${AWS::StackName}-submit-function-role
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-submit-function-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - batch:DescribeJobs
+                  - batch:SubmitJob
+                Resource: "*"
+              - Effect: Deny
+                Action:
+                  - logs:CreateLogGroup
+                Resource: "*"
+
+  JobSubmitFunctionLogGroup:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-submit-function
+      RetentionInDays: 7
+
+  # ------------------------------------------------------------#
+  # EC2
+  # ------------------------------------------------------------#
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-ec2-client-sg
+      GroupDescription: Enable SSH access
+      VpcId: !GetAtt VpcLookup.VpcId
+      SecurityGroupIngress:
+        # ssh from home IP
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+        # ssh via EC2 Instance Connect
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 3.112.23.0/29
+        # allow all traffic within the subnet
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !GetAtt PublicSubnetC.CidrBlock
+
+  ClusterKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${AWS::StackName}-cluster-key"
+      KeyType: rsa
+
+  MasterNode:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - RoutetoInternet
+    Properties:
+      ImageId: ami-0a290015b99140cd1
+      InstanceType: t3.small
+      KeyName: !Ref ClusterKeyPair
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref PublicSubnetC
+          GroupSet:
+            - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-master
+
+  TargetNode1:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - RoutetoInternet
+    Properties:
+      ImageId: ami-0a290015b99140cd1
+      InstanceType: t3.small
+      KeyName: !Ref ClusterKeyPair
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref PublicSubnetC
+          GroupSet:
+            - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-dev-target-1
+
+  TargetNode2:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - RoutetoInternet
+    Properties:
+      ImageId: ami-0a290015b99140cd1
+      InstanceType: t3.small
+      KeyName: !Ref ClusterKeyPair
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref PublicSubnetC
+          GroupSet:
+            - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-dev-target-2
+
+  UserRole:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-user
+      Users:
+        - !Ref UserName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ec2:GetConsoleScreenshot
+              - ec2:GetPasswordData
+              - ec2:Describe*
+              - cloudwatch:ListMetrics
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:Describe*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ec2:StartInstances
+              - ec2:StopInstances
+              - ec2-instance-connect:SendSSHPublicKey
+              - ec2-instance-connect:OpenTunnel
+            Resource:
+              - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${MasterNode}
+              - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TargetNode1}
+              - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TargetNode2}
+          - Effect: Deny
+            Action:
+              - ec2:RunInstances
+              - ec2:TerminateInstances
+            Resource: "*"
+
+Outputs:
+  InitJobStatus:
+    Description: Status web page of the initialization job
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/batch/home?region=${AWS::Region}#/jobs/fargate/detail/${JobSubmit.JobId}

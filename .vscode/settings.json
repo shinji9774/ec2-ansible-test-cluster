@@ -1,6 +1,6 @@
 {
     "yaml.schemas": {
-        "https://raw.githubusercontent.com/aws/serverless-application-model/main/samtranslator/schema/schema.json": "template-aws-batch.yaml"
+        "https://raw.githubusercontent.com/aws/serverless-application-model/main/samtranslator/schema/schema.json": "cf-template-*.yaml"
     },
     "ansible.python.interpreterPath": "/usr/bin/python3"
 }
