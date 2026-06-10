@@ -216,6 +216,10 @@ Resources:
             Value: !Ref TargetNode1
           - Name: TARGET_TARGET02_INSTANCE_ID
             Value: !Ref TargetNode2
+          - Name: TARGET_TARGET03_INSTANCE_ID
+            Value: !Ref TargetNode3
+          - Name: TARGET_TARGET04_INSTANCE_ID
+            Value: !Ref TargetNode4
           - Name: KEYPAIR_ID
             Value: !GetAtt ClusterKeyPair.KeyPairId
           - Name: KEY_NAME
@@ -246,6 +250,8 @@ Resources:
       - MasterNode
       - TargetNode1
       - TargetNode2
+      - TargetNode3
+      - TargetNode4
     Properties:
       ServiceToken: !GetAtt JobSubmitFunction.Arn
       JobName: !Sub ${AWS::StackName}-init-job
@@ -452,6 +458,42 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}-dev-target-2
 
+  TargetNode3:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - RoutetoInternet
+    Properties:
+      ImageId: ami-0a290015b99140cd1
+      InstanceType: t3.small
+      KeyName: !Ref ClusterKeyPair
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref PublicSubnetC
+          GroupSet:
+            - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-test-target-1
+
+  TargetNode4:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - RoutetoInternet
+    Properties:
+      ImageId: ami-0a290015b99140cd1
+      InstanceType: t3.small
+      KeyName: !Ref ClusterKeyPair
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref PublicSubnetC
+          GroupSet:
+            - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-test-target-2
+
   UserRole:
     Type: AWS::IAM::Policy
     Properties:
@@ -480,6 +522,8 @@ Resources:
               - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${MasterNode}
               - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TargetNode1}
               - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TargetNode2}
+              - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TargetNode3}
+              - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${TargetNode4}
           - Effect: Deny
             Action:
               - ec2:RunInstances
