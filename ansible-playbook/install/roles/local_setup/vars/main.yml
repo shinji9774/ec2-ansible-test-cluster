@@ -8,3 +8,9 @@ local_setup_targets:
   - host: "{{ target_target02 }}"
     groups:
       - targets
+  - host: "{{ target_target03 }}"
+    groups:
+      - targets
+  - host: "{{ target_target04 }}"
+    groups:
+      - targets

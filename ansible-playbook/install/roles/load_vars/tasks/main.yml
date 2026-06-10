@@ -4,6 +4,8 @@
     target_master: "{{ lookup('env', 'TARGET_MASTER_INSTANCE_ID', default=undef()) }}"
     target_target01: "{{ lookup('env', 'TARGET_TARGET01_INSTANCE_ID', default=undef()) }}"
     target_target02: "{{ lookup('env', 'TARGET_TARGET02_INSTANCE_ID', default=undef()) }}"
+    target_target03: "{{ lookup('env', 'TARGET_TARGET03_INSTANCE_ID', default=undef()) }}"
+    target_target04: "{{ lookup('env', 'TARGET_TARGET04_INSTANCE_ID', default=undef()) }}"
     keypair_id: "{{ lookup('env', 'KEYPAIR_ID', default=undef()) }}"
     home_key_pair_name: "{{ lookup('env', 'KEY_NAME', default=undef()) }}"
     aws_region: "{{ lookup('env', 'AWS_REGION', default=undef()) }}"
